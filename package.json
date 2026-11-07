@@ -1,0 +1,15 @@
+{
+  "name": "garrick-mermaid-editor",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "canvg": "4.0.3",
+    "esbuild": "0.28.2",
+    "mermaid": "12.3.0"
+  }
+}

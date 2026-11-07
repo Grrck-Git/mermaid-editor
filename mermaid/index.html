@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mermaid Editor</title>
+  <link rel="stylesheet" href="/assets/editor-chrome.css">
+  <style>
+    :root {
+      --bg: #151515;
+      --panel: #1d1c1a;
+      --panel-2: #252320;
+      --panel-3: #302c28;
+      --text: #e8e6df;
+      --muted: #b4ada3;
+      --border: #45433f;
+      --accent: #ff8865;
+      --danger: #ff6b6b;
+      --success: #7bd88f;
+      --warning: #ffcf5a;
+      --shadow: 0 10px 30px rgba(0,0,0,.3);
+      --radius: 12px;
+      --font: var(--editor-sans);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .title-group { display: flex; align-items: center; gap: 12px; }
+
+    .title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .2px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button, select, input[type="text"] {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled { opacity: .55; cursor: default; }
+
+    button:hover, select:hover {
+      border-color: var(--accent);
+    }
+
+    .layout {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1fr);
+      transition: grid-template-columns .2s ease;
+    }
+
+    .layout.sidebar-collapsed {
+      grid-template-columns: 0 1fr 1fr;
+    }
+
+    .layout.sidebar-collapsed .sidebar {
+      border-right: none;
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .layout.sidebar-collapsed .sidebar > * {
+      display: none;
+    }
+
+    .sidebar {
+      grid-row: 1;
+      grid-column: 1;
+      min-width: 0;
+      min-height: 0;
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      overflow: auto;
+      transition: opacity .2s ease;
+    }
+
+    .sidebar-section {
+      border-bottom: 1px solid var(--border);
+      padding: 14px;
+    }
+
+    .sidebar-section h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .template-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .template-btn {
+      width: 100%;
+      text-align: left;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .template-btn:hover {
+      border-color: var(--accent);
+    }
+
+    .template-btn small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .sidebar-note {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .sidebar-row {
+      display: grid;
+      gap: 8px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .pane {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+
+    .preview-pane {
+      border-right: none;
+    }
+
+    .pane-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      resize: none;
+      border: none;
+      outline-offset: -3px;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.5;
+      tab-size: 2;
+    }
+
+    .preview-wrap {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,.02) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.02) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.02) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.02) 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+
+    .preview-card {
+      min-height: 100%;
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      overflow: auto;
+    }
+
+    .preview-card.transparent {
+      background: transparent;
+      background-image:
+        linear-gradient(45deg, rgba(0,0,0,.08) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(0,0,0,.08) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(0,0,0,.08) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(0,0,0,.08) 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+
+    .sharebar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .sharebar input {
+      flex: 1;
+      min-width: 220px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    #statusbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--danger);
+      white-space: pre-wrap;
+    }
+
+    .ok {
+      color: var(--success);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .tool-menu { position: relative; }
+    .tool-menu summary {
+      cursor: pointer;
+      padding: 9px 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .tool-menu div {
+      position: absolute;
+      z-index: 2;
+      right: 0;
+      top: calc(100% + 4px);
+      display: grid;
+      gap: 4px;
+      min-width: max-content;
+      padding: 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    .modal::backdrop { background: rgba(0,0,0,.55); }
+
+    .modal {
+      width: min(1100px, calc(100% - 24px));
+      height: min(85vh, 900px);
+      padding: 0;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .modal[open] {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .modal-toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-2);
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: var(--panel-3);
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .chip.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .modal-body {
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .help-section {
+      display: none;
+    }
+
+    .help-section.active {
+      display: block;
+    }
+
+    .help-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .help-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-2);
+      overflow: hidden;
+    }
+
+    .help-card h3 {
+      margin: 0;
+      padding: 12px 14px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-3);
+    }
+
+    .help-card .body {
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    pre {
+      margin: 10px 0 0;
+      padding: 12px;
+      border-radius: 10px;
+      background: #0b0d12;
+      color: #dce7ff;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    code.inline {
+      font-family: var(--mono);
+      background: #0b0d12;
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #dce7ff;
+    }
+
+    .help-note {
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-2);
+      color: var(--muted);
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1200px) {
+      .layout {
+        grid-template-columns: 240px 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .app { height: auto; min-height: 100vh; }
+      .layout, .layout.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+      .sidebar { grid-area: auto; }
+      .source-pane { min-height: 45vh; }
+      .preview-pane { height: 55vh; }
+      .sidebar, .pane { border-right: none; border-bottom: 1px solid var(--border); }
+      .sharebar input { min-width: min(100%, 220px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="title-group">
+        <a class="editor-home" href="/">Garrick.co</a>
+        <h1 class="title">Mermaid Editor</h1>
+      </div>
+      <div class="actions">
+        <button id="renderBtn">Render</button>
+        <button id="copyShareBtn" aria-describedby="shareNote">Share</button>
+        <details class="tool-menu">
+          <summary>Export</summary>
+          <div>
+            <button id="downloadSvgBtn">Download SVG</button>
+            <button id="downloadPngBtn">Download PNG</button>
+            <button id="downloadSourceBtn">Export .mmd</button>
+            <button id="copySvgBtn">Copy SVG</button>
+            <button id="copyImageBtn">Copy PNG</button>
+            <button id="copyFenceBtn">Copy Markdown Fence</button>
+          </div>
+        </details>
+        <details class="tool-menu">
+          <summary>File</summary>
+          <div>
+            <button id="loadSourceBtn">Import .mmd</button>
+            <button id="saveBtn">Save Local</button>
+            <button id="loadBtn">Load Local</button>
+            <button id="resetBtn">Reset Sample</button>
+          </div>
+        </details>
+        <button id="undoReplaceBtn" disabled>Undo Replace</button>
+        <button id="helpBtn">Help</button>
+        <button id="toggleSidebarBtn" aria-controls="sidebar" aria-expanded="true">Templates &amp; Settings</button>
+      </div>
+    </div>
+
+    <div id="mainLayout" class="layout">
+      <section class="pane source-pane">
+        <div class="pane-header">
+          <label for="code">Diagram source</label>
+          <span id="charCount">0 chars</span>
+        </div>
+        <div class="sharebar">
+          <input id="shareUrl" type="text" aria-label="Share link" aria-describedby="shareNote" readonly value="" />
+          <button id="loadFromUrlBtn">Load URL State</button>
+          <small id="shareNote">Anyone with the link can read the diagram source.</small>
+        </div>
+        <textarea id="code" spellcheck="false"></textarea>
+      </section>
+
+      <section class="pane preview-pane" aria-labelledby="previewTitle">
+        <div class="pane-header">
+          <span id="previewTitle">Live preview</span>
+          <span id="renderState">Waiting</span>
+        </div>
+        <div class="preview-wrap">
+          <div id="previewCard" class="preview-card">
+            <div id="preview"></div>
+            <div id="error" class="error hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside id="sidebar" class="sidebar" aria-label="Templates and settings">
+        <div class="sidebar-section">
+          <h3>Templates</h3>
+          <div class="template-list" id="templateList"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Display</h3>
+          <div class="sidebar-row">
+            <label for="themeSelect">Mermaid theme</label>
+            <select id="themeSelect">
+              <option value="default">default</option>
+              <option value="neutral">neutral</option>
+              <option value="dark">dark</option>
+              <option value="forest">forest</option>
+              <option value="base">base</option>
+            </select>
+          </div>
+          <div class="sidebar-row">
+            <label for="renderModeSelect">Render mode</label>
+            <select id="renderModeSelect">
+              <option value="pretty">Pretty preview</option>
+              <option value="strict">Strict SVG-safe</option>
+            </select>
+          </div>
+          <label class="toggle-row">
+            <input id="transparentToggle" type="checkbox" />
+            <span>Transparent PNG background</span>
+          </label>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Export</h3>
+          <div class="sidebar-row">
+            <label for="exportFontSelect">Export font</label>
+            <select id="exportFontSelect">
+              <option value="Arial, Helvetica, sans-serif">Arial / Helvetica</option>
+              <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+              <option value="'Inter', Arial, sans-serif">Inter</option>
+              <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet MS</option>
+              <option value="'Courier New', Courier, monospace">Courier New</option>
+            </select>
+          </div>
+          <div class="sidebar-row">
+            <label for="pngScaleSelect">PNG scale</label>
+            <select id="pngScaleSelect">
+              <option value="1">1x</option>
+              <option value="2" selected>2x</option>
+              <option value="4">4x</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Notes</h3>
+          <div class="sidebar-note">
+            Use Undo Replace to recover the source after selecting a template or resetting the sample.
+            Theme changes re-render the preview.
+            Render mode controls whether the on-screen preview matches export-safe SVG output.
+            Transparent PNG export keeps the canvas background clear instead of forcing white.
+          </div>
+        </div>
+      </aside>
+
+    </div>
+
+    <div id="statusbar">
+      <div id="statusText" role="status">Loading renderer…</div>
+      <div>
+        Shortcuts:
+        <span class="ok">Ctrl/Cmd+Enter</span> render,
+        <span class="ok">Ctrl/Cmd+S</span> save,
+        <span class="ok">?</span> help
+      </div>
+    </div>
+  </div>
+
+  <dialog id="helpModal" class="modal" aria-labelledby="helpTitle">
+      <div class="modal-header">
+        <h2 id="helpTitle">Mermaid syntax help</h2>
+        <div class="actions">
+          <button id="closeHelpBtn">Close</button>
+        </div>
+      </div>
+
+      <div class="modal-toolbar" id="helpTabs">
+        <button class="chip active" data-help="basics">Basics</button>
+        <button class="chip" data-help="flowchart">Flowchart</button>
+        <button class="chip" data-help="sequence">Sequence</button>
+        <button class="chip" data-help="class">Class</button>
+        <button class="chip" data-help="state">State</button>
+        <button class="chip" data-help="er">ER</button>
+        <button class="chip" data-help="gantt">Gantt</button>
+        <button class="chip" data-help="other">Other</button>
+      </div>
+
+      <div class="modal-body">
+        <section class="help-section active" data-help-section="basics">
+          <div class="help-note">
+            Most Mermaid diagrams start with a diagram type such as <code class="inline">flowchart</code>,
+            <code class="inline">sequenceDiagram</code>, <code class="inline">classDiagram</code>,
+            <code class="inline">stateDiagram-v2</code>, <code class="inline">erDiagram</code>,
+            or <code class="inline">gantt</code>. Comments use <code class="inline">%%</code>.
+          </div>
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>General shape</h3>
+              <div class="body">
+<pre>%% comment
+flowchart TD
+A[Start] --> B[Finish]</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Common parser gotchas</h3>
+              <div class="body">
+<pre>flowchart TD
+A --> B[End]</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Direction keywords</h3>
+              <div class="body">
+<pre>flowchart TD
+flowchart LR</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Styling basics</h3>
+              <div class="body">
+<pre>flowchart LR
+A --> B
+style A fill:#e8f1ff,stroke:#4d89ff
+style B fill:#eaffea,stroke:#2c9b45</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="help-section" data-help-section="flowchart">
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>Basic flowchart</h3>
+              <div class="body">
+<pre>flowchart TD
+A[Start] --> B{Decision}
+B -->|Yes| C[Do thing]
+B -->|No| D[Stop]</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Subgraph</h3>
+              <div class="body">
+<pre>flowchart LR
+subgraph Backend
+  A[API] --> B[DB]
+end
+C[Browser] --> A</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Node styles</h3>
+              <div class="body">
+<pre>flowchart TD
+A[Rectangle]
+B(Rounded)
+C{Diamond}
+D((Circle))
+A --> B --> C --> D</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="help-section" data-help-section="sequence">
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>Basic sequence</h3>
+              <div class="body">
+<pre>sequenceDiagram
+participant U as User
+participant A as App
+U->>A: Submit request
+A-->>U: Response</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Alt / else</h3>
+              <div class="body">
+<pre>sequenceDiagram
+Alice->>Bob: Check status
+alt success
+  Bob-->>Alice: Approved
+else failure
+  Bob-->>Alice: Rejected
+end</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="help-section" data-help-section="class">
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>Basic class diagram</h3>
+              <div class="body">
+<pre>classDiagram
+class Animal {
+  +String name
+  +eat()
+}
+class Dog {
+  +bark()
+}
+Animal <|-- Dog</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="help-section" data-help-section="state">
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>State diagram</h3>
+              <div class="body">
+<pre>stateDiagram-v2
+[*] --> Draft
+Draft --> Review
+Review --> Approved
+Approved --> [*]</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="help-section" data-help-section="er">
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>Entity relationship</h3>
+              <div class="body">
+<pre>erDiagram
+CUSTOMER ||--o{ ORDER : places
+ORDER ||--|{ LINE_ITEM : contains</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="help-section" data-help-section="gantt">
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>Basic Gantt</h3>
+              <div class="body">
+<pre>gantt
+title Project timeline
+dateFormat YYYY-MM-DD
+section Planning
+Requirements :done, a1, 2026-04-01, 5d</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="help-section" data-help-section="other">
+          <div class="help-grid">
+            <div class="help-card">
+              <h3>Pie</h3>
+              <div class="body">
+<pre>pie title Budget split
+"Ops" : 42
+"Labor" : 33</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Mindmap</h3>
+              <div class="body">
+<pre>mindmap
+  root((Project))
+    Scope
+    Risks</pre>
+              </div>
+            </div>
+            <div class="help-card">
+              <h3>Timeline</h3>
+              <div class="body">
+<pre>timeline
+title Program history
+2024 : Pilot begins</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+  </dialog>
+
+  <input id="fileInput" type="file" accept=".mmd,.txt,.md" class="hidden" />
+
+  <script type="module">
+    const renderer = import("./vendor/renderer.js").then(
+      ({ mermaid, Canvg }) => ({ mermaid, Canvg }),
+      () => null
+    );
+
+    const SAMPLE = `flowchart TD
+A[Open editor anywhere] --> B[Write Mermaid]
+B --> C[Live preview in browser]
+C --> D[Share by URL]
+C --> E[Help popup with examples]
+D --> F[Open on another device]
+
+style A fill:#e8f1ff,stroke:#4d89ff,stroke-width:1px
+style E fill:#fff7df,stroke:#c29500,stroke-width:1px
+style F fill:#eaffea,stroke:#2c9b45,stroke-width:1px`;
+
+    const TEMPLATES = [
+      {
+        name: "Blank flowchart",
+        description: "Simple starting point",
+        code: `flowchart TD
+A[Start] --> B[Next step]
+B --> C[Finish]`
+      },
+      {
+        name: "Decision tree",
+        description: "Branching yes/no flow",
+        code: `flowchart TD
+A[Request] --> B{Approved?}
+B -->|Yes| C[Proceed]
+B -->|No| D[Reject]`
+      },
+      {
+        name: "Sequence",
+        description: "Actors and messages",
+        code: `sequenceDiagram
+participant User
+participant App
+participant API
+User->>App: Submit
+App->>API: Request
+API-->>App: Response
+App-->>User: Done`
+      },
+      {
+        name: "Class diagram",
+        description: "Types and relationships",
+        code: `classDiagram
+class Animal {
+  +String name
+  +eat()
+}
+class Dog {
+  +bark()
+}
+Animal <|-- Dog`
+      },
+      {
+        name: "State diagram",
+        description: "Lifecycle flow",
+        code: `stateDiagram-v2
+[*] --> Draft
+Draft --> Review
+Review --> Approved
+Review --> Rework
+Approved --> [*]`
+      },
+      {
+        name: "ER diagram",
+        description: "Data model",
+        code: `erDiagram
+CUSTOMER ||--o{ ORDER : places
+ORDER ||--|{ LINE_ITEM : contains
+PRODUCT ||--o{ LINE_ITEM : used_in`
+      },
+      {
+        name: "Gantt",
+        description: "Timeline and milestones",
+        code: `gantt
+title Project timeline
+dateFormat YYYY-MM-DD
+section Planning
+Requirements :done, a1, 2026-04-01, 5d
+Design :active, a2, after a1, 7d
+section Build
+Implementation :a3, after a2, 10d`
+      },
+      {
+        name: "Mindmap",
+        description: "Brainstorm layout",
+        code: `mindmap
+  root((Project))
+    Scope
+    Risks
+    Budget
+    Schedule`
+      }
+    ];
+
+    const STORAGE_KEY = "grrck_mermaid_editor_source";
+    const THEME_KEY = "grrck_mermaid_editor_theme";
+    const TRANSPARENT_KEY = "grrck_mermaid_editor_transparent_png";
+    const RENDER_MODE_KEY = "grrck_mermaid_editor_render_mode";
+    const EXPORT_FONT_KEY = "grrck_mermaid_editor_export_font";
+    const PNG_SCALE_KEY = "grrck_mermaid_editor_png_scale";
+    const SIDEBAR_COLLAPSED_KEY = "grrck_mermaid_editor_sidebar_collapsed";
+
+    const codeEl = document.getElementById("code");
+    const previewEl = document.getElementById("preview");
+    const previewCardEl = document.getElementById("previewCard");
+    const errorEl = document.getElementById("error");
+    const charCountEl = document.getElementById("charCount");
+    const renderStateEl = document.getElementById("renderState");
+    const statusTextEl = document.getElementById("statusText");
+    const shareUrlEl = document.getElementById("shareUrl");
+    const fileInputEl = document.getElementById("fileInput");
+    const helpModalEl = document.getElementById("helpModal");
+    const templateListEl = document.getElementById("templateList");
+    const themeSelectEl = document.getElementById("themeSelect");
+    const renderModeSelectEl = document.getElementById("renderModeSelect");
+    const transparentToggleEl = document.getElementById("transparentToggle");
+    const exportFontSelectEl = document.getElementById("exportFontSelect");
+    const pngScaleSelectEl = document.getElementById("pngScaleSelect");
+    const mainLayoutEl = document.getElementById("mainLayout");
+    const toggleSidebarBtnEl = document.getElementById("toggleSidebarBtn");
+
+    let renderTimer = null;
+    let sharedNeedsRender = false;
+    let preserveLocalDraft = false;
+    let previousSource = null;
+    let renderQueue = Promise.resolve();
+    let previewVersion = 0;
+    let diagramId = 0;
+    let lastSvg = "";
+    const narrowLayout = matchMedia("(max-width: 980px)");
+    const undoReplaceBtn = document.getElementById("undoReplaceBtn");
+
+    async function getRenderer() {
+      const modules = await renderer;
+      if (!modules) throw new Error("The diagram renderer could not load. Reload the page to retry.");
+      return modules;
+    }
+
+    function renderSvg(source, container, forExport = false) {
+      // Mermaid shares its configuration across renders.
+      const theme = themeSelectEl.value;
+      const htmlLabels = !forExport && renderModeSelectEl.value !== "strict";
+      const render = renderQueue.then(async () => {
+        const { mermaid } = await getRenderer();
+        mermaid.initialize({
+          startOnLoad: false,
+          suppressErrorRendering: true,
+          theme,
+          securityLevel: "strict",
+          htmlLabels,
+          flowchart: { useMaxWidth: !forExport }
+        });
+        const { svg } = await mermaid.render(`mermaid-${++diagramId}`, source, container);
+        // Mermaid can emit URL links even when callback binding is disabled.
+        const markup = document.createElement("template");
+        markup.innerHTML = svg;
+        const links = markup.content.querySelectorAll("a");
+        if (!links.length) return svg;
+        for (const link of links) {
+          link.removeAttribute("href");
+          link.removeAttributeNS("http://www.w3.org/1999/xlink", "href");
+          link.removeAttribute("target");
+        }
+        return new XMLSerializer().serializeToString(markup.content.firstElementChild);
+      });
+      renderQueue = render.catch(() => {});
+      return render;
+    }
+
+    function setStatus(msg, isError = false) {
+      statusTextEl.textContent = msg;
+      statusTextEl.className = isError ? "error" : "";
+    }
+
+    function updateCounts() {
+      charCountEl.textContent = `${codeEl.value.length} chars`;
+    }
+
+    function showError(message) {
+      lastSvg = "";
+      previewEl.innerHTML = "";
+      errorEl.textContent = message;
+      errorEl.classList.remove("hidden");
+      renderStateEl.textContent = "Error";
+      setStatus("Render failed.", true);
+    }
+
+    function clearError() {
+      errorEl.textContent = "";
+      errorEl.classList.add("hidden");
+    }
+
+    function encodeSource(source) {
+      return encodeURIComponent(btoa(unescape(encodeURIComponent(source))));
+    }
+
+    function decodeSource(encoded) {
+      return decodeURIComponent(escape(atob(decodeURIComponent(encoded))));
+    }
+
+    function updateShareUrl() {
+      try {
+        const encoded = encodeSource(codeEl.value);
+        const theme = encodeURIComponent(themeSelectEl.value);
+        const transparent = transparentToggleEl.checked ? "1" : "0";
+        const mode = encodeURIComponent(renderModeSelectEl.value);
+        const url = `${location.origin}${location.pathname}#code=${encoded}&theme=${theme}&transparent=${transparent}&mode=${mode}`;
+        shareUrlEl.value = url;
+      } catch {
+        shareUrlEl.value = "";
+      }
+    }
+
+    function parseHash() {
+      const hash = location.hash.startsWith("#") ? location.hash.slice(1) : "";
+      const params = new URLSearchParams(hash);
+      return {
+        code: params.get("code"),
+        theme: params.get("theme"),
+        transparent: params.get("transparent"),
+        mode: params.get("mode")
+      };
+    }
+
+    function applyTransparentPreview() {
+      previewCardEl.classList.toggle("transparent", transparentToggleEl.checked);
+      localStorage.setItem(TRANSPARENT_KEY, transparentToggleEl.checked ? "1" : "0");
+      updateShareUrl();
+    }
+
+    function getExportFontFamily() {
+      return exportFontSelectEl.value || "Arial, Helvetica, sans-serif";
+    }
+
+    function getPngScale() {
+      const scale = Number.parseInt(pngScaleSelectEl.value || "2", 10);
+      return [1, 2, 4].includes(scale) ? scale : 2;
+    }
+
+    function sidebarStorageKey() {
+      return narrowLayout.matches ? `${SIDEBAR_COLLAPSED_KEY}-mobile` : SIDEBAR_COLLAPSED_KEY;
+    }
+
+    function setSidebarCollapsed(collapsed) {
+      mainLayoutEl.classList.toggle("sidebar-collapsed", collapsed);
+      toggleSidebarBtnEl.setAttribute("aria-expanded", String(!collapsed));
+    }
+
+    function loadSidebarSetting() {
+      const saved = localStorage.getItem(sidebarStorageKey());
+      setSidebarCollapsed(saved === null ? narrowLayout.matches : saved === "1");
+    }
+
+    function toggleSidebar() {
+      const collapsed = !mainLayoutEl.classList.contains("sidebar-collapsed");
+      setSidebarCollapsed(collapsed);
+      localStorage.setItem(sidebarStorageKey(), collapsed ? "1" : "0");
+    }
+
+    function loadFromHash() {
+      const state = parseHash();
+      try {
+        const source = state.code && decodeSource(state.code);
+        if (!source?.trim()) return false;
+
+        clearTimeout(renderTimer);
+        previewVersion++;
+        lastSvg = "";
+        sharedNeedsRender = true;
+        preserveLocalDraft = true;
+        codeEl.value = source;
+        if (Array.from(themeSelectEl.options).some(option => option.value === state.theme)) {
+          themeSelectEl.value = state.theme;
+        }
+        if (Array.from(renderModeSelectEl.options).some(option => option.value === state.mode)) {
+          renderModeSelectEl.value = state.mode;
+        }
+        transparentToggleEl.checked = state.transparent === "1";
+        previewCardEl.classList.toggle("transparent", transparentToggleEl.checked);
+
+        updateCounts();
+        updateShareUrl();
+        previewEl.replaceChildren();
+        clearError();
+        renderStateEl.textContent = "Awaiting review";
+        setStatus("Review the shared source, then select Render.");
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function renderManually() {
+      sharedNeedsRender = false;
+      renderDiagram();
+    }
+
+    async function renderDiagram() {
+      const version = ++previewVersion;
+      lastSvg = "";
+      const source = codeEl.value.trim();
+      updateCounts();
+      updateShareUrl();
+      if (sharedNeedsRender) return;
+
+      if (!source) {
+        showError("No Mermaid code found.");
+        return;
+      }
+
+      clearError();
+      renderStateEl.textContent = "Rendering…";
+      try {
+        const svg = await renderSvg(source);
+        if (version !== previewVersion) return;
+        lastSvg = svg;
+        previewEl.innerHTML = svg;
+        renderStateEl.textContent = "Rendered";
+        setStatus("Render complete.");
+      } catch (err) {
+        if (version === previewVersion) showError(err?.message || String(err));
+      }
+    }
+
+    function scheduleRender() {
+      window.clearTimeout(renderTimer);
+      renderTimer = window.setTimeout(() => {
+        renderDiagram();
+        saveLocal(false);
+      }, 350);
+    }
+
+    function saveLocal(showMessage = true) {
+      if (!preserveLocalDraft || showMessage) localStorage.setItem(STORAGE_KEY, codeEl.value);
+      localStorage.setItem(THEME_KEY, themeSelectEl.value);
+      localStorage.setItem(TRANSPARENT_KEY, transparentToggleEl.checked ? "1" : "0");
+      localStorage.setItem(RENDER_MODE_KEY, renderModeSelectEl.value);
+      localStorage.setItem(EXPORT_FONT_KEY, exportFontSelectEl.value);
+      localStorage.setItem(PNG_SCALE_KEY, pngScaleSelectEl.value);
+      if (showMessage) setStatus("Saved to browser local storage.");
+    }
+
+    function loadLocal(showMessage = true, render = true) {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      sharedNeedsRender = false;
+      preserveLocalDraft = false;
+      const savedTheme = localStorage.getItem(THEME_KEY);
+      const savedTransparent = localStorage.getItem(TRANSPARENT_KEY);
+      const savedRenderMode = localStorage.getItem(RENDER_MODE_KEY);
+      const savedExportFont = localStorage.getItem(EXPORT_FONT_KEY);
+      const savedPngScale = localStorage.getItem(PNG_SCALE_KEY);
+
+      if (savedTheme && Array.from(themeSelectEl.options).some(o => o.value === savedTheme)) {
+        themeSelectEl.value = savedTheme;
+      }
+      if (savedRenderMode && Array.from(renderModeSelectEl.options).some(o => o.value === savedRenderMode)) {
+        renderModeSelectEl.value = savedRenderMode;
+      }
+      if (savedExportFont && Array.from(exportFontSelectEl.options).some(o => o.value === savedExportFont)) {
+        exportFontSelectEl.value = savedExportFont;
+      }
+      if (savedPngScale && Array.from(pngScaleSelectEl.options).some(o => o.value === savedPngScale)) {
+        pngScaleSelectEl.value = savedPngScale;
+      }
+      transparentToggleEl.checked = savedTransparent === "1";
+      loadSidebarSetting();
+      applyTransparentPreview();
+
+      codeEl.value = saved && saved.trim() ? saved : SAMPLE;
+      updateCounts();
+      updateShareUrl();
+      if (render) renderDiagram();
+
+      if (showMessage) setStatus(saved ? "Loaded saved diagram." : "Loaded sample diagram.");
+    }
+
+    async function copySvg() {
+      try {
+        if (!lastSvg) throw new Error("Render a diagram before copying its SVG.");
+        await navigator.clipboard.writeText(lastSvg);
+        setStatus("SVG copied to clipboard.");
+      } catch (err) {
+        setStatus(`Copy SVG failed: ${err?.message || err}`, true);
+      }
+    }
+
+    async function copyMarkdownFence() {
+      const source = codeEl.value || "";
+      if (!source.trim()) {
+        setStatus("Nothing to copy yet.", true);
+        return;
+      }
+      const fenced = "```mermaid\n" + source + "\n```";
+      try {
+        await navigator.clipboard.writeText(fenced);
+        setStatus("Markdown code fence copied.");
+      } catch {
+        setStatus("Clipboard copy failed.", true);
+      }
+    }
+
+    async function renderPng(transparent, scale) {
+      const { svgText, width, height } = await renderExportSvg();
+      const canvas = document.createElement("canvas");
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas unavailable.");
+
+      if (!transparent) {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      ctx.scale(scale, scale);
+      const { Canvg } = await getRenderer();
+      const drawing = Canvg.fromString(ctx, svgText, {
+        ignoreMouse: true,
+        ignoreAnimation: true,
+        ignoreDimensions: true,
+        ignoreClear: true
+      });
+      await drawing.render();
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("Could not create a PNG.");
+      return blob;
+    }
+
+    async function copyImage() {
+      try {
+        if (!navigator.clipboard?.write || !window.ClipboardItem) {
+          throw new Error("Image clipboard unavailable. Use Download PNG instead.");
+        }
+        // Start the clipboard write during the click, while rendering proceeds.
+        const image = renderPng(transparentToggleEl.checked, getPngScale());
+        await Promise.all([image, navigator.clipboard.write([new ClipboardItem({ "image/png": image })])]);
+        setStatus("PNG copied to clipboard.");
+      } catch (err) {
+        setStatus(`Copy image failed: ${err?.message || err}`, true);
+      }
+    }
+
+    async function copyShareLink() {
+      if (!shareUrlEl.value) {
+        setStatus("No share link available.", true);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(shareUrlEl.value);
+        setStatus("Share link copied.");
+      } catch {
+        setStatus("Copy failed.", true);
+      }
+    }
+
+    function downloadTextFile(filename, content, mimeType) {
+      downloadFile(filename, new Blob([content], { type: mimeType }));
+    }
+
+    function downloadFile(filename, blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function replaceBrWithNewlinesInsideQuotes(source) {
+      const input = String(source || "");
+      let out = "";
+      let inDouble = false;
+      let escaped = false;
+
+      for (let i = 0; i < input.length; i++) {
+        const ch = input[i];
+        const nextSlice = input.slice(i);
+
+        if (ch === '"' && !escaped) {
+          inDouble = !inDouble;
+          out += ch;
+          escaped = false;
+          continue;
+        }
+
+        if (inDouble) {
+          const m = nextSlice.match(/^<br\s*\/?>/i);
+          if (m) {
+            out += "\\n";
+            i += m[0].length - 1;
+            escaped = false;
+            continue;
+          }
+        }
+
+        out += ch;
+        escaped = (ch === "\\" && !escaped);
+        if (ch !== "\\") escaped = false;
+      }
+
+      return out;
+    }
+
+    function sanitizeSourceForExport(source) {
+      let sanitized = replaceBrWithNewlinesInsideQuotes(String(source || ""));
+      sanitized = sanitized.replace(/<\/?(?:span|strong|em|b|i|u|small|sub|sup)[^>]*>/gi, "");
+      return sanitized;
+    }
+
+
+    function foreignObjectTextWithBreaks(fo) {
+      let html = fo.innerHTML || "";
+      html = html.replace(/<br\s*\/?>/gi, "\n");
+      html = html.replace(/<\/?(?:div|p|li|ul|ol)[^>]*>/gi, "\n");
+      html = html.replace(/<[^>]+>/g, "");
+
+      const textarea = document.createElement("textarea");
+      textarea.innerHTML = html;
+
+      return textarea.value
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .split("\n")
+        .map(line => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    function convertForeignObjectsToText(svgEl) {
+      const foreignObjects = svgEl.querySelectorAll("foreignObject");
+      foreignObjects.forEach((fo, index) => {
+        const textContent = foreignObjectTextWithBreaks(fo);
+        if (!textContent) {
+          fo.remove();
+          return;
+        }
+
+        const x = parseFloat(fo.getAttribute("x") || "0");
+        const y = parseFloat(fo.getAttribute("y") || "0");
+        const width = parseFloat(fo.getAttribute("width") || "0");
+        const height = parseFloat(fo.getAttribute("height") || "0");
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", String(x + width / 2));
+        text.setAttribute("y", String(y + height / 2));
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "middle");
+        text.setAttribute("font-family", getExportFontFamily());
+        text.setAttribute("font-size", "14px");
+        text.setAttribute("fill", "#333");
+
+        const lines = textContent.split(/\n+/);
+        const lineHeight = 16;
+        const startDy = -((lines.length - 1) * lineHeight) / 2;
+
+        lines.forEach((line, i) => {
+          const tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+          tspan.setAttribute("x", String(x + width / 2));
+          tspan.setAttribute("dy", i === 0 ? String(startDy) : String(lineHeight));
+          tspan.textContent = line;
+          text.appendChild(tspan);
+        });
+
+        const parent = fo.parentNode;
+        if (parent) {
+          parent.insertBefore(text, fo);
+        }
+        fo.remove();
+      });
+    }
+
+    async function renderExportSvg() {
+      if (sharedNeedsRender) throw new Error("Review the shared source and select Render first.");
+      const source = sanitizeSourceForExport((codeEl.value || "").trim());
+      if (!source) {
+        throw new Error("No Mermaid code found.");
+      }
+
+      const exportContainer = document.createElement("div");
+      exportContainer.style.position = "fixed";
+      exportContainer.style.left = "-99999px";
+      exportContainer.style.top = "0";
+      exportContainer.style.width = "max-content";
+      exportContainer.style.height = "max-content";
+      exportContainer.style.pointerEvents = "none";
+      exportContainer.style.opacity = "0";
+      document.body.appendChild(exportContainer);
+
+      try {
+        const svg = await renderSvg(source, exportContainer, true);
+        exportContainer.innerHTML = svg;
+
+        const svgEl = exportContainer.querySelector("svg");
+        if (!svgEl) {
+          throw new Error("Export SVG could not be generated.");
+        }
+
+        // Convert any remaining foreignObject-based labels into plain SVG text so exported SVG/PNG keeps labels.
+        if (svgEl.querySelector("foreignObject")) {
+          convertForeignObjectsToText(svgEl);
+        }
+
+        let width = 0;
+        let height = 0;
+
+        const vb = svgEl.viewBox && svgEl.viewBox.baseVal;
+        if (vb && vb.width && vb.height) {
+          width = vb.width;
+          height = vb.height;
+        }
+
+        if (!width || !height) {
+          const bbox = svgEl.getBBox();
+          width = bbox.width;
+          height = bbox.height;
+        }
+
+        if (!width || !height) {
+          const rect = svgEl.getBoundingClientRect();
+          width = rect.width;
+          height = rect.height;
+        }
+
+        width = Math.max(1, Math.ceil(width));
+        height = Math.max(1, Math.ceil(height));
+
+        svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        svgEl.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+        svgEl.setAttribute("width", String(width));
+        svgEl.setAttribute("height", String(height));
+        if (!svgEl.getAttribute("viewBox")) {
+          svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        }
+
+        svgEl.setAttribute("font-family", getExportFontFamily());
+
+        // Inline computed styles so downloaded SVG is standalone.
+        const allNodes = svgEl.querySelectorAll("*");
+        for (const node of allNodes) {
+          if (!(node instanceof Element)) continue;
+          const computed = window.getComputedStyle(node);
+          const currentStyle = node.getAttribute("style") || "";
+          const extra = [
+            `fill:${computed.fill}`,
+            `stroke:${computed.stroke}`,
+            `stroke-width:${computed.strokeWidth}`,
+            `font-family:${getExportFontFamily()}`,
+            `font-size:${computed.fontSize}`,
+            `font-weight:${computed.fontWeight}`,
+            `font-style:${computed.fontStyle}`,
+            `text-anchor:${computed.textAnchor}`,
+            `dominant-baseline:${computed.dominantBaseline}`,
+            `letter-spacing:${computed.letterSpacing}`,
+            `word-spacing:${computed.wordSpacing}`
+          ].join(";");
+          node.setAttribute("style", currentStyle ? `${currentStyle};${extra}` : extra);
+        }
+
+        const svgText = new XMLSerializer().serializeToString(svgEl);
+        return { svgText, width, height };
+      } finally {
+        exportContainer.remove();
+      }
+    }
+
+    async function downloadSvg() {
+      try {
+        const { svgText } = await renderExportSvg();
+        downloadTextFile("diagram.svg", svgText, "image/svg+xml;charset=utf-8");
+        setStatus("SVG download started.");
+      } catch (err) {
+        setStatus(`SVG export failed: ${err?.message || err}`, true);
+      }
+    }
+
+    function downloadSource() {
+      const source = codeEl.value || "";
+      downloadTextFile("diagram.mmd", source, "text/plain;charset=utf-8");
+      setStatus("Source export started.");
+    }
+
+    async function downloadPng() {
+      try {
+        const transparent = transparentToggleEl.checked;
+        const blob = await renderPng(transparent, getPngScale());
+        downloadFile(transparent ? "diagram-transparent.png" : "diagram.png", blob);
+        setStatus("PNG download started.");
+      } catch (err) {
+        setStatus(`PNG export failed: ${err?.message || err}`, true);
+      }
+    }
+
+    function importSourceFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || "");
+        replaceSource(text, `Loaded ${file.name}. Select Render after reviewing the source.`, true);
+      };
+      reader.onerror = () => setStatus("Could not read file.", true);
+      reader.readAsText(file);
+    }
+
+    function openHelp() {
+      if (!helpModalEl.open) helpModalEl.showModal();
+    }
+
+    function closeHelp() {
+      helpModalEl.close();
+    }
+
+    function switchHelpTab(name) {
+      document.querySelectorAll(".chip[data-help]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.help === name);
+      });
+      document.querySelectorAll(".help-section").forEach(section => {
+        section.classList.toggle("active", section.dataset.helpSection === name);
+      });
+    }
+
+    function replaceSource(source, message, needsReview = false) {
+      clearTimeout(renderTimer);
+      previousSource = { source: codeEl.value, preserveLocalDraft, sharedNeedsRender };
+      undoReplaceBtn.disabled = false;
+      preserveLocalDraft = needsReview;
+      sharedNeedsRender = needsReview;
+      codeEl.value = source;
+      if (needsReview) {
+        previewEl.replaceChildren();
+        clearError();
+        renderStateEl.textContent = "Awaiting review";
+      }
+      renderDiagram();
+      saveLocal(false);
+      setStatus(message);
+    }
+
+    function undoReplace() {
+      if (!previousSource) return;
+      clearTimeout(renderTimer);
+      ({ source: codeEl.value, preserveLocalDraft, sharedNeedsRender } = previousSource);
+      previousSource = null;
+      undoReplaceBtn.disabled = true;
+      previewEl.replaceChildren();
+      clearError();
+      if (sharedNeedsRender) renderStateEl.textContent = "Awaiting review";
+      renderDiagram();
+      saveLocal(false);
+      setStatus("Previous source restored.");
+    }
+
+    function buildTemplateButtons() {
+      templateListEl.innerHTML = "";
+      for (const template of TEMPLATES) {
+        const btn = document.createElement("button");
+        btn.className = "template-btn";
+        btn.type = "button";
+        btn.innerHTML = `${template.name}<small>${template.description}</small>`;
+        btn.addEventListener("click", () => replaceSource(template.code, `Loaded template: ${template.name}.`));
+        templateListEl.appendChild(btn);
+      }
+    }
+
+    document.getElementById("renderBtn").addEventListener("click", renderManually);
+    document.getElementById("helpBtn").addEventListener("click", openHelp);
+    document.getElementById("closeHelpBtn").addEventListener("click", closeHelp);
+    document.getElementById("copySvgBtn").addEventListener("click", copySvg);
+    document.getElementById("copyFenceBtn").addEventListener("click", copyMarkdownFence);
+    document.getElementById("copyImageBtn").addEventListener("click", copyImage);
+    document.getElementById("downloadSvgBtn").addEventListener("click", downloadSvg);
+    document.getElementById("downloadPngBtn").addEventListener("click", downloadPng);
+    document.getElementById("downloadSourceBtn").addEventListener("click", downloadSource);
+    document.getElementById("loadSourceBtn").addEventListener("click", () => fileInputEl.click());
+    document.getElementById("saveBtn").addEventListener("click", () => saveLocal(true));
+    document.getElementById("loadBtn").addEventListener("click", () => loadLocal(true));
+    document.getElementById("copyShareBtn").addEventListener("click", copyShareLink);
+    document.getElementById("loadFromUrlBtn").addEventListener("click", () => {
+      if (!loadFromHash()) setStatus("No valid URL state found.", true);
+    });
+    document.getElementById("resetBtn").addEventListener("click", () => replaceSource(SAMPLE, "Sample restored."));
+    undoReplaceBtn.addEventListener("click", undoReplace);
+
+    for (const menu of document.querySelectorAll(".tool-menu")) {
+      menu.addEventListener("click", event => {
+        if (event.target.closest("button")) {
+          menu.open = false;
+          menu.querySelector("summary").focus();
+        }
+      });
+    }
+
+    document.getElementById("helpTabs").addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip[data-help]");
+      if (!btn) return;
+      switchHelpTab(btn.dataset.help);
+    });
+
+    toggleSidebarBtnEl.addEventListener("click", toggleSidebar);
+    narrowLayout.addEventListener("change", loadSidebarSetting);
+
+    renderModeSelectEl.addEventListener("change", () => {
+      updateShareUrl();
+      saveLocal(false);
+      renderDiagram();
+      setStatus(renderModeSelectEl.value === "strict" ? "Strict SVG-safe preview enabled." : "Pretty preview enabled.");
+    });
+
+    exportFontSelectEl.addEventListener("change", () => {
+      saveLocal(false);
+      setStatus("Export font updated.");
+    });
+
+    pngScaleSelectEl.addEventListener("change", () => {
+      saveLocal(false);
+      setStatus(`PNG scale set to ${getPngScale()}x.`);
+    });
+
+    themeSelectEl.addEventListener("change", () => {
+      updateShareUrl();
+      saveLocal(false);
+      renderDiagram();
+      setStatus(`Theme changed to ${themeSelectEl.value}.`);
+    });
+
+    transparentToggleEl.addEventListener("change", () => {
+      applyTransparentPreview();
+      saveLocal(false);
+      setStatus(transparentToggleEl.checked ? "Transparent PNG enabled." : "Transparent PNG disabled.");
+    });
+
+    fileInputEl.addEventListener("change", () => {
+      const file = fileInputEl.files?.[0];
+      if (file) importSourceFile(file);
+      fileInputEl.value = "";
+    });
+
+    codeEl.addEventListener("input", () => {
+      preserveLocalDraft = false;
+      lastSvg = "";
+      updateCounts();
+      updateShareUrl();
+      scheduleRender();
+    });
+
+    window.addEventListener("hashchange", () => {
+      loadFromHash();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        renderManually();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveLocal(true);
+      }
+      if (e.key === "?") {
+        const target = e.target;
+        const typing = target && (
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "INPUT" ||
+          target.isContentEditable
+        );
+        if (!typing) {
+          e.preventDefault();
+          openHelp();
+        }
+      }
+    });
+
+    buildTemplateButtons();
+    loadLocal(false, !location.hash);
+    if (location.hash && !loadFromHash()) renderDiagram();
+  </script>
+</body>
+</html>
