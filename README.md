@@ -8,6 +8,8 @@ Try the [live editor on Garrick.co](https://garrick.co/mermaid/).
 This repository is a standalone source snapshot for anyone who wants to use,
 fork, or adapt the editor. Garrick.co is deployed separately.
 
+Current release is **v1.0.0**. [Release notes and source downloads](https://github.com/Grrck-Git/mermaid-editor/releases/tag/v1.0.0)
+
 ## Run locally
 
 With Node.js 22 or newer and Python 3 installed, run these commands from the
